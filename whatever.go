@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 
+	"encoding/json"
+
 	"strings"
 
 	"time"
@@ -146,4 +148,149 @@ func merge(nums1 []int, m int, nums2 []int, n int) {
 		j++
 		k++
 	}
+}
+
+// Manager represents a company manager with specific fields
+type Manager struct {
+	FullName       string `json:"full_name,omitempty"`
+	Position       string `json:"position,omitempty"`
+	Age            int32  `json:"age,omitempty"`
+	YearsInCompany int32  `json:"years_in_company,omitempty"`
+}
+
+// EncodeManager encodes a Manager object to JSON and returns an io.Reader
+func EncodeManager(manager *Manager) (io.Reader, error) {
+	// Check if manager is nil
+	if manager == nil {
+		return nil, nil
+	}
+
+	// Marshal the manager object to JSON
+	jsonData, err := json.Marshal(manager)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create and return a reader containing the JSON data
+	return bytes.NewReader(jsonData), nil
+}
+
+func asdf() {
+	// Example usage
+	manager := &Manager{
+		FullName:       "Chris Smith",
+		Position:       "CISO",
+		Age:            32,
+		YearsInCompany: 5,
+	}
+
+	reader, err := EncodeManager(manager)
+	if err != nil {
+		panic(err)
+	}
+
+	// Read and print the JSON for demonstration
+	data, _ := io.ReadAll(reader)
+	println(string(data))
+}
+
+func camelCaseTo_snack_case(str string) string {
+	var result []byte
+
+	for i, b := range []byte(str) {
+
+		upperCased := strings.ToUpper(string(b))[0]
+		if b != upperCased {
+			result = append(result, b)
+		} else {
+			if i == 0 {
+				result = append(result, strings.ToLower(string(b))[0])
+			} else {
+				result = append(result, '_', strings.ToLower(string(b))[0])
+			}
+		}
+	}
+
+	return string(result)
+}
+
+// Exercise 3: Implement a function that finds the longest increasing subsequence
+// Example: [10, 9, 2, 5, 3, 7, 101, 18] -> [2, 5, 7, 101]
+// func longestIncreasingSubsequence(nums []int) []int {
+// 	var arr [][]int
+// 	i := 0
+// 	arr = append(arr, []int{nums[i]})
+// 	i++
+// 	for i < len(nums) {
+// 		nextNum := nums[i]
+// 		isInserted := false
+// 		for j, a := range arr {
+// 			lastNum := a[len(a)-1]
+// 			if lastNum < nextNum {
+// 				arr[j] = append(a, nextNum)
+// 				isInserted = true
+// 			}
+// 		}
+// 		if !isInserted {
+// 			arr = append(arr, []int{nextNum})
+// 		}
+// 		i++
+// 	}
+
+// 	var maxArr []int
+// 	maxLen := 0
+// 	for _, a := range arr {
+// 		fmt.Println(a)
+// 		if maxLen < len(a) {
+// 			maxLen = len(a)
+// 			maxArr = a
+// 		}
+// 	}
+// 	return maxArr
+// }
+
+func longestIncreasingSubsequence(nums []int) []int {
+	if len(nums) == 0 {
+		return []int{}
+	}
+
+	// Initialize DP arrays
+	dp := make([]int, len(nums))   // dp[i] will hold the length of the LIS ending at index i
+	prev := make([]int, len(nums)) // prev[i] will hold the index of the previous element in the LIS
+	maxLength := 1                 // Length of the maximum LIS
+	maxIndex := 0                  // Index of the last element in the LIS
+
+	for i := range nums {
+		dp[i] = 1    // Every element is a subsequence of length 1
+		prev[i] = -1 // No previous element by default
+		for j := 0; j < i; j++ {
+			if nums[j] < nums[i] && dp[j]+1 > dp[i] {
+				dp[i] = dp[j] + 1
+				prev[i] = j
+			}
+		}
+		if dp[i] > maxLength {
+			maxLength = dp[i]
+			maxIndex = i
+		}
+	}
+
+	// Reconstruct the LIS
+	lis := make([]int, 0, maxLength)
+	for maxIndex != -1 {
+		lis = append([]int{nums[maxIndex]}, lis...)
+		maxIndex = prev[maxIndex]
+	}
+
+	return lis
+}
+
+// Exercise 4: Write a function that rotates a slice by k positions
+// Example: ([1,2,3,4,5], k=2) -> [4,5,1,2,3]
+func rotateSlice(slice []int, k int) []int {
+	arr := make([]int, len(slice))
+	for i := 0; i < len(slice); i++ {
+		arr[(i+k)%len(slice)] = slice[i]
+	}
+	return arr
 }
