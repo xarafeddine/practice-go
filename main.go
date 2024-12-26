@@ -32,7 +32,6 @@ func matchingStrings(strings []string, queries []string) []int32 {
 }
 func main() {
 
-	// str := strconv.FormatInt(4, 2)
+	logParser("text.txt", "normalFile", "errFile")
 
-	logParserAnalist()
 }

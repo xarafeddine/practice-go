@@ -1,9 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
+	"os"
+	"regexp"
+	"sync"
 
 	"encoding/json"
 
@@ -293,4 +298,215 @@ func rotateSlice(slice []int, k int) []int {
 		arr[(i+k)%len(slice)] = slice[i]
 	}
 	return arr
+}
+
+const filename = "asdf"
+
+func writeToFile(bytesChannel chan []byte, doneChannel chan bool, errChannel chan error) {
+	file, err := os.Create(filename)
+	errChannel <- err
+	if err != nil {
+		return
+	}
+
+	for {
+		select {
+		case input := <-bytesChannel:
+			_, err := file.Write(input)
+			errChannel <- err
+			if err != nil {
+				return
+			}
+		case <-doneChannel:
+			return
+		}
+	}
+
+}
+
+var (
+	timeoutErr = errors.New("timeout error")
+	maxDelay   = 5000 * time.Millisecond // 5 seconds max delay
+)
+
+func ServerWithTimeout(matchChan chan bool, errChan chan error, requestStrChan chan bool, resultStrChan chan string, requestRegChan chan bool, resultRegChan chan *regexp.Regexp) {
+	for {
+		var str string
+		var reg *regexp.Regexp
+		requestStrChan <- true
+		select {
+		case s := <-resultStrChan:
+			str = s
+		case <-time.After(maxDelay):
+			errChan <- timeoutErr
+			return
+		}
+		requestRegChan <- true
+		select {
+		case r := <-resultRegChan:
+			reg = r
+		case <-time.After(maxDelay):
+			errChan <- timeoutErr
+			return
+		}
+		matchChan <- reg.MatchString(str)
+	}
+}
+
+/*
+ * Complete the 'logParser' function below.
+ *
+ * The function accepts following parameters:
+ *  1. STRING inputFileName
+ *  2. STRING normalFileName
+ *  3. STRING errorFileName
+ */
+
+//	2023-05-20 09:12:34 | INFO | Data backup completed successfully | IP: 192.168.1.10
+//
+// 2023-05-20 11:45:21 | ERROR | Connection timeout | IP: 192.168.1.20
+// 2023-05-20 14:27:55 | WARNING | Disk space usage exceeded 90% | IP: 192.168.1.30
+// 2023-05-20 17:59:12 | INFO | New user registered | IP: 192.168.1.40
+
+// my shity implementation
+func logParser(inputFileName string, normalFileName string, errorFileName string) {
+	// panic("asdf")
+	input, err := os.ReadFile(inputFileName)
+	if err != nil {
+		panic("err")
+	}
+	lines := strings.Split(string(input), "\n")
+
+	errLogChan := make(chan string)
+	normalLogChan := make(chan string)
+
+	var wg sync.WaitGroup
+
+	for _, line := range lines {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			parts := strings.Split(line, "|")
+			if len(parts) != 4 {
+				panic("error parsing!!")
+			}
+
+			logType := strings.Trim(parts[1], " ")
+
+			if logType == "ERROR" {
+				errLogChan <- line
+			} else {
+				normalLogChan <- line
+			}
+
+		}()
+
+	}
+
+	go func() {
+		wg.Wait()
+		close(errLogChan)
+		close(normalLogChan)
+	}()
+
+	var wwg sync.WaitGroup
+	wwg.Add(2)
+	go func() {
+		defer wwg.Done()
+		errFile, err := os.Create(errorFileName)
+		if err != nil {
+			panic("asdf")
+		}
+		defer errFile.Close()
+		logWriter(errFile, errLogChan)
+	}()
+
+	go func() {
+		defer wwg.Done()
+		File, err := os.Create(normalFileName)
+
+		if err != nil {
+			panic("asdf")
+		}
+		defer File.Close()
+		logWriter(File, normalLogChan)
+	}()
+
+	wwg.Wait()
+
+}
+
+func logWriter(out io.Writer, ch <-chan string) {
+	for log := range ch {
+		out.Write([]byte(log))
+
+	}
+}
+
+// good impelementation
+func logParser1(inputFileName string, normalFileName string, errorFileName string) {
+	// Open input file
+	inputFile, err := os.Open(inputFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer inputFile.Close()
+
+	// Open output files
+	normalFile, err := os.Create(normalFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer normalFile.Close()
+
+	errorFile, err := os.Create(errorFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer errorFile.Close()
+
+	// Create channels for normal and error logs
+	normalChan := make(chan string)
+	errorChan := make(chan string)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	// Start goroutines for writing to files
+	go func() {
+		logWriter(normalFile, normalChan)
+		wg.Done()
+	}()
+
+	go func() {
+		logWriter(errorFile, errorChan)
+		wg.Done()
+	}()
+
+	// Read and process input file
+	scanner := bufio.NewScanner(inputFile)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.Contains(line, "| ERROR |") {
+			errorChan <- line
+		} else {
+			normalChan <- line
+		}
+	}
+
+	// Close channels after processing
+	close(normalChan)
+	close(errorChan)
+
+	// Wait for writers to finish
+	wg.Wait()
+}
+
+func logWriter1(out io.Writer, ch <-chan string) {
+	writer := bufio.NewWriter(out)
+	for line := range ch {
+		writer.WriteString(line + "\n")
+		writer.Flush()
+	}
 }
