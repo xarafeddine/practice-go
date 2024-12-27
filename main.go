@@ -32,6 +32,6 @@ func matchingStrings(strings []string, queries []string) []int32 {
 }
 func main() {
 
-	logParser("text.txt", "normalFile", "errFile")
+	netHttp()
 
 }
