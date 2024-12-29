@@ -1,22 +1,27 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"time"
 )
 
+// handler functions
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("very good\n"))
 }
 
 func resourceHandler(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	userId := r.Context().Value("userId").(string)
+	fmt.Println(userId)
 	message := "your id is " + id + "\n"
 	w.Write([]byte(message))
 }
 
+// middleware
 type responseWrapper struct {
 	http.ResponseWriter
 	statusCode int
@@ -47,7 +52,10 @@ func logger(next http.Handler) http.Handler {
 				ResponseWriter: w,
 				statusCode:     http.StatusOK,
 			}
-			next.ServeHTTP(rw, r)
+			// just an example of how to pass data between middlwares
+			ctx := context.WithValue(r.Context(), "userId", "1234")
+			req := r.WithContext(ctx)
+			next.ServeHTTP(rw, req)
 			log.Println(rw.statusCode, r.Method, r.URL.Path, time.Since(start))
 		},
 	)
